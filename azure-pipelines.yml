@@ -5,8 +5,6 @@ pool:
   vmImage: 'windows-latest'  # Use a Microsoft-hosted agent with Windows environment
 
 variables:
-  sourceKeyVaultName: 'kmx-sbx-edw-sales-kv2'  # Name of the source Key Vault
-  targetKeyVaultName: 'kmx-sbx-edw-asso-kv'   # Name of the target Key Vault
   azureSubscription: '<your-service-connection-name>'  # Azure service connection name
   scriptUrl: 'https://raw.githubusercontent.com/arthi3008/Vanguard/main/validation.ps1'  # Direct link to the script in GitHub
 
