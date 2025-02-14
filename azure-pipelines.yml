@@ -1,1 +1,39 @@
+trigger:
+- main  # Trigger on push to the main branch or change this to your preferred branch
+
+pool:
+  vmImage: 'windows-latest'  # Use a Microsoft-hosted agent with Windows environment
+
+variables:
+  sourceKeyVaultName: 'kmx-sbx-edw-sales-kv2'  # Name of the source Key Vault
+  targetKeyVaultName: 'kmx-sbx-edw-asso-kv'   # Name of the target Key Vault
+  azureSubscription: '<your-service-connection-name>'  # Azure service connection name
+  scriptUrl: 'https://raw.githubusercontent.com/arthi3008/Vanguard/main/validation.ps1'  # Direct link to the script in GitHub
+
+jobs:
+- job: MigrateSecrets
+  displayName: 'Migrate Key Vault Secrets'
+  steps:
+
+  # Step to authenticate using Azure service connection
+  - task: AzureCLI@2
+    inputs:
+      azureSubscription: $(azureSubscription)
+      scriptType: 'pscore'  # Use PowerShell Core (cross-platform). Use 'ps' for Windows PowerShell
+      scriptLocation: 'inlineScript'
+      inlineScript: |
+        # Log in to Azure
+        Connect-AzAccount
+
+        # Ensure the Az module is installed
+        Install-Module -Name Az -Force -AllowClobber -Scope CurrentUser
+
+        # Download the script from GitHub
+        Invoke-WebRequest -Uri $(scriptUrl) -OutFile "$(Build.SourcesDirectory)\validation.ps1"
+
+        # Run the downloaded PowerShell script
+        Write-Host "Starting migration of secrets..."
+        .\$(Build.SourcesDirectory)\validation.ps1
+
+      displayName: 'Authenticate and Run Migration Script'
 
