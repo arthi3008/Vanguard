@@ -1,12 +1,13 @@
-branches:
+trigger:
+  branches:
     include:
       - main
- 
+
 pr:
   branches:
     include:
       - main
- 
+
 parameters:
   - name: env
     displayName: Environment
@@ -17,7 +18,7 @@ parameters:
       - qa
       - prod
       - prod_dr
- 
+
   - name: domain
     displayName: Azure Data Factory
     type: string
@@ -30,23 +31,30 @@ parameters:
       - finance
       - nonedw
       - sales
+
   - name: sourceKeyVaultName
     displayName: Source Key Vault Name
     type: string
     default: 'source-keyvault-name'
- 
+
   - name: targetKeyVaultName
     displayName: Target Key Vault Name
     type: string
     default: 'target-keyvault-name'
- 
+
 variables:
   - name: pool
     value: 'ubuntu-latest'
- 
+
+  - name: azureSubscription
+    ${{ if eq(parameters.env, 'qa') }}:
+      value: 'edw-ingestion-qa-azuredevops.com'
+    ${{ else }}:
+      value: 'edw-ingestion-prod-azuredevops.com'
+
 pool:
   vmImage: $(pool)
- 
+
 stages:
   - stage: Build
     displayName: 'Build'
@@ -59,7 +67,7 @@ stages:
             inputs:
               targetPath: '$(Pipeline.Workspace)'
               artifactName: keyvault_migration
- 
+
       - job: runCode
         displayName: 'Run PowerShell Script for KeyVault Migration'
         dependsOn: publishJob
@@ -67,41 +75,35 @@ stages:
           - task: AzureCLI@2
             displayName: 'Run PowerShell Script'
             inputs:
-              azureSubscription: ${{ if eq(parameters.env, 'qa') }}: 'edw-ingestion-qa-azuredevops.com' 
-                                      ${{ else }}: 'edw-ingestion-prod-azuredevops.com'
+              azureSubscription: $(azureSubscription)
               scriptType: pwsh
               scriptLocation: inlineScript
               inlineScript: |
-                # Get the source and target Key Vault names from the parameters
                 $sourceKeyVaultName = "${{ parameters.sourceKeyVaultName }}"
                 $targetKeyVaultName = "${{ parameters.targetKeyVaultName }}"
- 
-                # Connect to Azure with system-assigned managed identity
+
                 $AzureContextID = (Connect-AzAccount -Identity).context
                 Set-AzContext -Subscription "ec9f8bb9-8972-4fb4-8a59-b403b114974d" -DefaultProfile $AzureContextID
- 
-                # Function to convert SecureString to plain string
+
                 function ConvertTo-PlainString($secureString) {
                     $ptr = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureString)
                     return [System.Runtime.InteropServices.Marshal]::PtrToStringBSTR($ptr)
                 }
- 
-                # Function to convert plain string to SecureString
+
                 function ConvertTo-SecureStringFromPlain($plainString) {
                     $secureString = New-Object -TypeName System.Security.SecureString
                     $plainString.ToCharArray() | ForEach-Object { $secureString.AppendChar($_) }
                     return $secureString
                 }
- 
-                # Loop through secrets in the source Key Vault and migrate them to the target Key Vault
+
                 foreach ($secret in (Get-AzKeyVaultSecret -VaultName $sourceKeyVaultName)) {
                     try {
                         $sourceSecretValue = (Get-AzKeyVaultSecret -VaultName $sourceKeyVaultName -Name $secret.Name).SecretValue
                         $targetSecret = Get-AzKeyVaultSecret -VaultName $targetKeyVaultName -Name $secret.Name -ErrorAction SilentlyContinue
- 
+
                         $sourceSecretPlainText = ConvertTo-PlainString($sourceSecretValue)
                         $targetSecretPlainText = if ($targetSecret) { ConvertTo-PlainString($targetSecret.SecretValue) } else { $null }
- 
+
                         if (-not $targetSecret -or $sourceSecretPlainText -ne $targetSecretPlainText) {
                             Set-AzKeyVaultSecret -VaultName $targetKeyVaultName -Name $secret.Name -SecretValue (ConvertTo-SecureStringFromPlain $sourceSecretPlainText)
                             Write-Host "Secret '$($secret.Name)' has been $(if ($targetSecret) {'updated'} else {'copied'}) in target Key Vault."
@@ -113,5 +115,5 @@ stages:
                         Write-Host "Error processing secret '$($secret.Name)': $_"
                     }
                 }
- 
+
                 Write-Host "Completed processing secrets from $sourceKeyVaultName to $targetKeyVaultName."
