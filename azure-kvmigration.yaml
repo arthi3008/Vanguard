@@ -48,9 +48,9 @@ variables:
 
   - name: azureSubscription
     ${{ if eq(parameters.env, 'qa') }}:
-      value: 'edw-ingestion-qa-azuredevops.com'
+      value: 'vanguard-nonprod-azuredevops.com'
     ${{ else }}:
-      value: 'edw-ingestion-prod-azuredevops.com'
+      value: 'vanguard-nonprod-azuredevops.com'
 
 pool:
   vmImage: $(pool)
