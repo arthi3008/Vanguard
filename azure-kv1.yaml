@@ -21,7 +21,6 @@ parameters:
       - nonedw
       - shared
 
-parameters:
   - name: sourceKeyVaultName
     displayName: Source Key Vault Name
     type: string
