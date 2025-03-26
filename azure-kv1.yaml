@@ -9,6 +9,19 @@ pr:
       - main
 
 parameters:
+  - name: domain
+    displayName: Domain Name
+    type: string
+    values:
+      - sales
+      - associates
+      - accounting
+      - finance
+      - customer
+      - nonedw
+      - shared
+
+parameters:
   - name: sourceKeyVaultName
     displayName: Source Key Vault Name
     type: string
