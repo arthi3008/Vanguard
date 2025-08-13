@@ -1,37 +1,112 @@
-trigger:
-- main  # Trigger on push to the main branch or change this to your preferred branch
+trigger: none
+ 
+parameters:
 
-pool:
-  vmImage: 'windows-latest'  # Use a Microsoft-hosted agent with Windows environment
+  - name: vmAction
 
+    displayName: 'Action (start or stop)'
+
+    type: string
+
+    default: 'start'
+
+    values:
+
+      - start
+
+      - stop
+ 
+  - name: vmNames
+
+    displayName: 'List of VM Names (comma-separated)'
+
+    type: string
+
+    default: 'vm1,vm2'
+ 
+  - name: resourceGroup
+
+    displayName: 'Resource Group Name'
+
+    type: string
+
+    default: 'RG Name'
+ 
 variables:
-  azureSubscription: '<your-service-connection-name>'  # Azure service connection name
-  scriptUrl: 'https://raw.githubusercontent.com/arthi3008/Vanguard/main/validation.ps1'  # Direct link to the script in GitHub
 
+  azureSubscription: 'data-analytics-platform-edw-dev'
+ 
 jobs:
-- job: MigrateSecrets
-  displayName: 'Migrate Key Vault Secrets'
+
+- job: ManageVMs
+
+  displayName: 'Start or Stop Azure VMs'
+
+  pool:
+
+    vmImage: 'ubuntu-latest'
+ 
   steps:
 
-  # Step to authenticate using Azure service connection
   - task: AzureCLI@2
+
+    displayName: 'Execute VM Actions for Multiple VMs'
+
     inputs:
+
       azureSubscription: $(azureSubscription)
-      scriptType: 'pscore'  # Use PowerShell Core (cross-platform). Use 'ps' for Windows PowerShell
+
+      scriptType: 'bash'
+
       scriptLocation: 'inlineScript'
+
       inlineScript: |
-        # Log in to Azure
-        Connect-AzAccount
 
-        # Ensure the Az module is installed
-        Install-Module -Name Az -Force -AllowClobber -Scope CurrentUser
+        echo "Action: ${{ parameters.vmAction }}"
 
-        # Download the script from GitHub
-        Invoke-WebRequest -Uri $(scriptUrl) -OutFile "$(Build.SourcesDirectory)\validation.ps1"
+        echo "VMs: ${{ parameters.vmNames }}"
 
-        # Run the downloaded PowerShell script
-        Write-Host "Starting migration of secrets..."
-        .\$(Build.SourcesDirectory)\validation.ps1
+        echo "Resource Group: ${{ parameters.resourceGroup }}"
 
-      displayName: 'Authenticate and Run Migration Script'
+        # Split comma-separated VM names into an array
 
+        IFS=',' read -ra VM_LIST <<< "${{ parameters.vmNames }}"
+ 
+        for vm in "${VM_LIST[@]}"; do
+
+          vm=$(echo $vm | xargs)  # Trim spaces
+
+          echo ""
+
+          echo "Processing VM: $vm"
+ 
+          az vm show --name "$vm" --resource-group "${{ parameters.resourceGroup }}" --query "name" -o tsv >/dev/null 2>&1
+
+          if [ $? -ne 0 ]; then
+
+            echo "VM '$vm' not found. Skipping."
+
+            continue
+
+          fi
+ 
+          if [ "${{ parameters.vmAction }}" == "start" ]; then
+
+            echo " Starting VM: $vm"
+
+            az vm start --resource-group "${{ parameters.resourceGroup }}" --name "$vm"
+
+          elif [ "${{ parameters.vmAction }}" == "stop" ]; then
+
+            echo "Stopping VM: $vm"
+
+            az vm deallocate --resource-group "${{ parameters.resourceGroup }}" --name "$vm"
+
+          else
+
+            echo "Invalid action specified!"
+
+            exit 1
+
+          fi
+ 
