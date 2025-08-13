@@ -34,7 +34,7 @@ parameters:
  
 variables:
 
-  azureSubscription: 'data-analytics-platform-edw-dev'
+  azureSubscription: 'TestSandbox'
  
 jobs:
 
