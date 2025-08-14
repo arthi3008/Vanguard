@@ -1,112 +1,37 @@
-trigger: none
- 
 parameters:
-
-  - name: vmAction
-
-    displayName: 'Action (start or stop)'
-
+  - name: vmList
+    displayName: 'Azure VM List (comma-separated)'
     type: string
-
-    default: 'start'
-
-    values:
-
-      - start
-
-      - stop
+    default: 'VM1,VM2'
  
-  - name: vmNames
-
-    displayName: 'List of VM Names (comma-separated)'
-
+  - name: action
+    displayName: 'Action to perform on VMs'
     type: string
-
-    default: 'vm1,vm2'
+    values:
+      - Start
+      - Stop
+    default: 'Stop'
  
   - name: resourceGroup
-
-    displayName: 'Resource Group Name'
-
+    displayName: 'Resource Group Name (optional)'
     type: string
-
-    default: 'RG Name'
+    default: ''
  
 variables:
-
-  azureSubscription: 'TestSandbox'
+  azureSubscription: 'CarMax'
+pool:
+  vmImage: 'windows-latest'
  
-jobs:
-
-- job: ManageVMs
-
-  displayName: 'Start or Stop Azure VMs'
-
-  pool:
-
-    vmImage: 'ubuntu-latest'
+steps:
  
-  steps:
-
-  - task: AzureCLI@2
-
-    displayName: 'Execute VM Actions for Multiple VMs'
-
-    inputs:
-
-      azureSubscription: $(azureSubscription)
-
-      scriptType: 'bash'
-
-      scriptLocation: 'inlineScript'
-
-      inlineScript: |
-
-        echo "Action: ${{ parameters.vmAction }}"
-
-        echo "VMs: ${{ parameters.vmNames }}"
-
-        echo "Resource Group: ${{ parameters.resourceGroup }}"
-
-        # Split comma-separated VM names into an array
-
-        IFS=',' read -ra VM_LIST <<< "${{ parameters.vmNames }}"
- 
-        for vm in "${VM_LIST[@]}"; do
-
-          vm=$(echo $vm | xargs)  # Trim spaces
-
-          echo ""
-
-          echo "Processing VM: $vm"
- 
-          az vm show --name "$vm" --resource-group "${{ parameters.resourceGroup }}" --query "name" -o tsv >/dev/null 2>&1
-
-          if [ $? -ne 0 ]; then
-
-            echo "VM '$vm' not found. Skipping."
-
-            continue
-
-          fi
- 
-          if [ "${{ parameters.vmAction }}" == "start" ]; then
-
-            echo " Starting VM: $vm"
-
-            az vm start --resource-group "${{ parameters.resourceGroup }}" --name "$vm"
-
-          elif [ "${{ parameters.vmAction }}" == "stop" ]; then
-
-            echo "Stopping VM: $vm"
-
-            az vm deallocate --resource-group "${{ parameters.resourceGroup }}" --name "$vm"
-
-          else
-
-            echo "Invalid action specified!"
-
-            exit 1
-
-          fi
- 
+- task: AzureCLI@2
+  displayName: 'Manage Azure VMs via PowerShell script'
+  inputs:
+    azureSubscription: $(azureSubscription)
+    scriptType: 'ps'
+    scriptLocation: 'scriptPath'
+    scriptPath: 'scripts/manage-vms.ps1'
+    arguments: >
+      -AzureVMList "${{ parameters.vmList }}"
+      -Action "${{ parameters.action }}"
+      -ResourceGroupName "${{ parameters.resourceGroup }}"
