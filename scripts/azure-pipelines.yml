@@ -1,37 +1,41 @@
-parameters:
-  - name: vmList
-    displayName: 'Azure VM List (comma-separated)'
-    type: string
-    default: 'VM1,VM2'
+trigger: none
  
-  - name: action
-    displayName: 'Action to perform on VMs'
-    type: string
-    values:
-      - Start
-      - Stop
-    default: 'Stop'
+# schedules:
+#  - cron: "0 3 * * *"      # 3 AM UTC = 11 PM ET
+#    displayName: "Stop VMs evening"
+#    branches:
+ #     include:
+ #       - main
+ #   always: true
  
-  - name: resourceGroup
-    displayName: 'Resource Group Name (optional)'
-    type: string
-    default: ''
+pool:
+  vmImage: ubuntu-latest
  
 variables:
-  azureSubscription: 'CarMax'
-pool:
-  vmImage: 'windows-latest'
+# vmDetails: '[{"name": "VM1", "resource_group": "ADMIN"}, {"name": "BI", "resource_group": "REPORTING"}]'
+  action: "stop"
+  sendEmail: "True"
  
 steps:
+  - task: UsePythonVersion@0
+    inputs:
+      versionSpec: '3.x'
+      addToPath: true
  
-- task: AzureCLI@2
-  displayName: 'Manage Azure VMs via PowerShell script'
-  inputs:
-    azureSubscription: $(azureSubscription)
-    scriptType: 'ps'
-    scriptLocation: 'scriptPath'
-    scriptPath: 'scripts/manage-vms.ps1'
-    arguments: >
-      -AzureVMList "${{ parameters.vmList }}"
-      -Action "${{ parameters.action }}"
-      -ResourceGroupName "${{ parameters.resourceGroup }}"
+  - task: AzureKeyVault@2
+    inputs:
+      azureSubscription: ''
+      KeyVaultName: 'kv'
+      SecretsFilter: 'SendGridKey'
+      RunAsPreJob: true
+ 
+  - script: |
+      python -m pip install --upgrade pip
+      pip install azure-identity azure-mgmt-compute sendgrid
+    displayName: "Install Dependencies"
+ 
+  - script: |
+      python start_stop_vm.py '$(vmDetails)' '$(action)' '$(sendEmail)'
+    displayName: "Start VMs"
+    env:
+    SendGridKey: $(SendGridKey)
