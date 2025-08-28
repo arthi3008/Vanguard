@@ -12,7 +12,7 @@ pool:
   vmImage: ubuntu-latest
  
 variables:
-# vmDetails: '[{"name": "VM1", "resource_group": "ADMIN"}, {"name": "BI", "resource_group": "REPORTING"}]'
+  vmDetails: '[{"name": "VM1", "resource_group": "ADMIN"}, {"name": "BI", "resource_group": "REPORTING"}]'
   action: "stop"
   sendEmail: "True"
  
